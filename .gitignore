@@ -3,3 +3,5 @@ venv/
 dist/
 build/
 PyCopy.spec
+copy_log.txt
+.gitignore

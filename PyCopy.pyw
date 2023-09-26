@@ -19,6 +19,7 @@ class FileCopier(QtCore.QObject):
         self.copied_files = 0
         self.thread = threading.Thread(target=self._copy_files_and_dirs)
         self.copied_folders = 0
+        self.log = []
 
     def _count_total_files(self):
         total_files = 0
@@ -49,6 +50,7 @@ class FileCopier(QtCore.QObject):
             self.completed.emit()
         except Exception as e:
             self.errorOccurred.emit(str(e))
+            self.log.append(f"Error: {str(e)}")
 
     def start(self):
         self.thread.start()
@@ -79,7 +81,7 @@ class CopyWindow(QtWidgets.QMainWindow):
         self.start_button.clicked.connect(self.start_copying)
 
         self.progress_bar = QtWidgets.QProgressBar()
-        
+
         self.info_label = QtWidgets.QLabel("File and folder permissions are copied as well.")
         self.info_label.setObjectName("infoLabel")
 
@@ -100,7 +102,7 @@ class CopyWindow(QtWidgets.QMainWindow):
         layout.addWidget(self.refresh_checkbox)
         layout.addWidget(self.start_button)
         layout.addWidget(self.progress_bar)
-        
+
         font = QtGui.QFont()
         font.setItalic(True)
         font.setPointSize(7)
@@ -111,10 +113,11 @@ class CopyWindow(QtWidgets.QMainWindow):
         container = QtWidgets.QWidget()
         container.setLayout(layout)
         self.setCentralWidget(container)
-        
+
         layout.addStretch(1)
 
         self.apply_styles()
+        self.log = []
 
     def apply_styles(self):
         styles = """
@@ -123,8 +126,8 @@ class CopyWindow(QtWidgets.QMainWindow):
             }
             
             #infoLabel {
-            color: darkgray;
-        }
+                color: darkgray;
+            }
 
             QPushButton {
                 background-color: #2196F3;
@@ -152,6 +155,9 @@ class CopyWindow(QtWidgets.QMainWindow):
         self.setStyleSheet(styles)
 
     def start_copying(self):
+        self.start_button.setStyleSheet("background-color: palevioletred;")
+        self.start_button.setText("Copying...")
+        
         source_path = self.source_input.text()
         destination_path = self.destination_input.text()
 
@@ -162,6 +168,7 @@ class CopyWindow(QtWidgets.QMainWindow):
         self.file_copier.progressChanged.connect(self.update_progress_bar)
         self.file_copier.completed.connect(self.on_completed)
         self.file_copier.errorOccurred.connect(self.on_error)
+        self.file_copier.log = self.log  # Pass log reference
         self.file_copier.start()
 
     def update_progress_bar(self, value):
@@ -169,16 +176,22 @@ class CopyWindow(QtWidgets.QMainWindow):
         self.progress_bar.setValue(percent_complete)
 
     def on_completed(self):
-        total_files_copied = self.file_copier.copied_files
-        total_folders_copied = self.file_copier.copied_folders
-    
-        message = (f"Copying completed!\n n\Files: {total_files_copied}\nFolders: {total_folders_copied}")
-    
-        QtWidgets.QMessageBox.information(self, "Completed", message)
-
+        self.log.append("Copying completed!")
+        self.show_log()
+        self.reset_button()
 
     def on_error(self, error_message):
-        QtWidgets.QMessageBox.critical(self, "Error", error_message)
+        self.log.append(f"Error: {error_message}")
+        self.show_log()
+        self.reset_button()
+
+    def reset_button(self):
+        self.start_button.setStyleSheet("background-color: #2196F3;")
+        self.start_button.setText("Start Copying")
+
+    def show_log(self):
+        with open("copy_log.txt", "w") as f:
+            f.write("\n".join(self.log))
 
     def browse_source(self):
         path = QtWidgets.QFileDialog.getExistingDirectory(self, "Select Source Directory")
